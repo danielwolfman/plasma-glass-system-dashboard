@@ -4,16 +4,49 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
+import org.kde.ksysguard.process as Processes
 import org.kde.ksysguard.sensors as Sensors
+import org.kde.ksysguard.process as Process
 
 PlasmoidItem {
     id: root
+
+    Process.ProcessDataModel {
+        id: processInspector
+        enabledAttributes: ["name", "pid", "gpu_usage", "gpu_memory", "gpu_module"]
+        flatList: true
+    }
+    Timer {
+        interval: 2500
+        running: true
+        repeat: true
+        onTriggered: {
+            const rows = []
+            for (let row = 0; row < processInspector.rowCount(); ++row) {
+                const usage = Number(processInspector.data(processInspector.index(row, 2), Process.ProcessDataModel.Value))
+                const module = String(processInspector.data(processInspector.index(row, 4), Process.ProcessDataModel.Value) || "")
+                if (usage > 0 || module.length > 0) {
+                    rows.push({
+                        name: processInspector.data(processInspector.index(row, 0), Process.ProcessDataModel.Value),
+                        pid: processInspector.data(processInspector.index(row, 1), Process.ProcessDataModel.Value),
+                        usage: usage,
+                        memory: processInspector.data(processInspector.index(row, 3), Process.ProcessDataModel.FormattedValue),
+                        module: module
+                    })
+                }
+            }
+            console.warn("GPU_PROCESS_ROWS=" + JSON.stringify(rows))
+        }
+    }
 
     property int updateInterval: 1000
     property int historyLength: 72
     property var cpuHistory: []
     property var downloadHistory: []
     property var uploadHistory: []
+    property var topCpuProcesses: []
+    property var topMemoryProcesses: []
+    property var topGpuProcesses: []
     property real networkMaximum: 1048576
 
     readonly property int warningLevel: Plasmoid.configuration.warningLevel || 70
@@ -77,14 +110,84 @@ PlasmoidItem {
         return total > 0 ? number(usedSensor) * 100 / total : 0
     }
 
+    function shortProcessName(value) {
+        let name = String(value || "unknown")
+        const argumentStart = name.indexOf(" --")
+        if (argumentStart > 0) {
+            name = name.slice(0, argumentStart)
+        }
+        const pathParts = name.split("/")
+        return pathParts[pathParts.length - 1]
+    }
+
+    function compactCommandLine(value) {
+        const commandLine = String(value || "").trim()
+        if (commandLine.length === 0) {
+            return ""
+        }
+
+        const argumentStart = commandLine.search(/\s/)
+        const executable = argumentStart < 0 ? commandLine : commandLine.slice(0, argumentStart)
+        const argumentsText = argumentStart < 0 ? "" : commandLine.slice(argumentStart)
+        const pathSeparator = executable.lastIndexOf("/")
+        const processName = pathSeparator < 0 ? executable : executable.slice(pathSeparator + 1)
+        return processName + argumentsText
+    }
+
+    function gpuLabel(value) {
+        const gpu = String(value || "").toLowerCase()
+        if (gpu.indexOf("nvidia") >= 0 || gpu.indexOf("rtx") >= 0) {
+            return "RTX"
+        }
+        if (gpu.indexOf("intel") >= 0 || gpu.indexOf("arc") >= 0) {
+            return "ARC"
+        }
+        return ""
+    }
+
+    function collectTopProcesses(metricColumn, limit) {
+        const rows = []
+        for (let row = 0; row < processModel.rowCount(); ++row) {
+            const valueIndex = processModel.index(row, metricColumn)
+            const value = Number(processModel.data(valueIndex, Processes.ProcessDataModel.Value)) || 0
+            if (value <= 0) {
+                continue
+            }
+
+            let formatted = processModel.data(valueIndex, Processes.ProcessDataModel.FormattedValue)
+            if (metricColumn === 4) {
+                formatted = (value < 10 ? value.toFixed(1) : Math.round(value)) + "%"
+            }
+
+            const processName = shortProcessName(processModel.data(processModel.index(row, 0), Processes.ProcessDataModel.Value))
+            const commandLine = compactCommandLine(processModel.data(processModel.index(row, 7), Processes.ProcessDataModel.Value))
+
+            rows.push({
+                name: (metricColumn === 2 || metricColumn === 3) && commandLine.length > 0 ? commandLine : processName,
+                pid: processModel.data(processModel.index(row, 1), Processes.ProcessDataModel.Value),
+                value: value,
+                formatted: formatted,
+                gpuLabel: gpuLabel(processModel.data(processModel.index(row, 6), Processes.ProcessDataModel.Value))
+            })
+        }
+        rows.sort((left, right) => right.value - left.value)
+        return rows.slice(0, limit)
+    }
+
+    function updateTopProcesses() {
+        topCpuProcesses = collectTopProcesses(2, 4)
+        topMemoryProcesses = collectTopProcesses(3, 4)
+        topGpuProcesses = collectTopProcesses(4, 4)
+    }
+
     fullRepresentation: Item {
         id: dashboard
         implicitWidth: 1180
-        implicitHeight: 620
+        implicitHeight: 760
         Layout.minimumWidth: 760
-        Layout.minimumHeight: 440
+        Layout.minimumHeight: 560
         Layout.preferredWidth: 1180
-        Layout.preferredHeight: 620
+        Layout.preferredHeight: 760
 
         Rectangle {
             anchors.fill: parent
@@ -406,21 +509,6 @@ PlasmoidItem {
                             valueText: Math.round(value) + "%"
                             color: root.percentColor(value, "#68a7ff")
                         }
-                        MeterBar {
-                            Layout.fillWidth: true
-                            title: i18n("MEMORY")
-                            value: root.gpuVramPercent(gpu1Vram, gpu1TotalVram)
-                            valueText: gpu1Vram.formattedValue
-                            color: root.percentColor(value, "#c792ea")
-                        }
-                        MeterBar {
-                            Layout.fillWidth: true
-                            title: i18n("TEMP")
-                            value: root.number(gpu1Temperature)
-                            maximum: 100
-                            valueText: value > 0 ? Math.round(value) + "°C" : "—"
-                            color: value > 0 ? root.temperatureColor(value, "#ff9f68") : "#51616a"
-                        }
                         Item { Layout.fillHeight: true }
                         RowLayout {
                             Layout.fillWidth: true
@@ -431,7 +519,70 @@ PlasmoidItem {
                     }
                 }
             }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: 0.72
+                spacing: 12
+
+                DashboardCard {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    title: i18n("Top CPU")
+                    subtitle: i18n("process usage")
+                    accent: "#55d6be"
+                    cardOpacity: root.cardOpacity
+
+                    TopProcessList {
+                        anchors.fill: parent
+                        entries: root.topCpuProcesses
+                        accent: "#55d6be"
+                    }
+                }
+
+                DashboardCard {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    title: i18n("Top Memory")
+                    subtitle: i18n("resident memory")
+                    accent: "#c792ea"
+                    cardOpacity: root.cardOpacity
+
+                    TopProcessList {
+                        anchors.fill: parent
+                        entries: root.topMemoryProcesses
+                        accent: "#c792ea"
+                    }
+                }
+
+                DashboardCard {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    title: i18n("Top GPU")
+                    subtitle: i18n("process usage")
+                    accent: "#76e06f"
+                    cardOpacity: root.cardOpacity
+
+                    TopProcessList {
+                        anchors.fill: parent
+                        entries: root.topGpuProcesses
+                        accent: "#76e06f"
+                        showGpuLabel: true
+                    }
+                }
+            }
         }
+    }
+
+    Processes.ProcessDataModel {
+        id: processModel
+        flatList: true
+        enabled: true
+        enabledAttributes: ["name", "pid", "usage", "memory", "gpu_usage", "gpu_memory", "gpu_module", "command"]
     }
 
     Sensors.Sensor { id: cpuUsage; sensorId: "cpu/all/usage"; updateRateLimit: root.updateInterval }
@@ -459,9 +610,6 @@ PlasmoidItem {
     Sensors.Sensor { id: gpu0Frequency; sensorId: "gpu/gpu0/coreFrequency"; updateRateLimit: root.updateInterval }
 
     Sensors.Sensor { id: gpu1Usage; sensorId: "gpu/gpu1/usage"; updateRateLimit: root.updateInterval }
-    Sensors.Sensor { id: gpu1Temperature; sensorId: "gpu/gpu1/temperature"; updateRateLimit: root.updateInterval }
-    Sensors.Sensor { id: gpu1Vram; sensorId: "gpu/gpu1/usedVram"; updateRateLimit: root.updateInterval }
-    Sensors.Sensor { id: gpu1TotalVram; sensorId: "gpu/gpu1/totalVram"; updateRateLimit: 10000 }
     Sensors.Sensor { id: gpu1Power; sensorId: "gpu/gpu1/power"; updateRateLimit: root.updateInterval }
     Sensors.Sensor { id: gpu1Frequency; sensorId: "gpu/gpu1/coreFrequency"; updateRateLimit: root.updateInterval }
 
@@ -471,5 +619,13 @@ PlasmoidItem {
         running: true
         triggeredOnStart: true
         onTriggered: root.sampleHistory()
+    }
+
+    Timer {
+        interval: 2000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.updateTopProcesses()
     }
 }
