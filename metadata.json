@@ -1,0 +1,22 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Daniel"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "A wide glass dashboard for CPU, memory, GPU, network, and storage",
+        "FormFactors": [
+            "desktop"
+        ],
+        "Icon": "utilities-system-monitor",
+        "Id": "org.daniel.systemdashboard",
+        "License": "GPL-3.0-or-later",
+        "Name": "Glass System Dashboard",
+        "Version": "1.1.0",
+        "Website": "https://kde.org"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
