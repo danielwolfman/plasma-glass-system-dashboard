@@ -6,38 +6,9 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 import org.kde.ksysguard.process as Processes
 import org.kde.ksysguard.sensors as Sensors
-import org.kde.ksysguard.process as Process
 
 PlasmoidItem {
     id: root
-
-    Process.ProcessDataModel {
-        id: processInspector
-        enabledAttributes: ["name", "pid", "gpu_usage", "gpu_memory", "gpu_module"]
-        flatList: true
-    }
-    Timer {
-        interval: 2500
-        running: true
-        repeat: true
-        onTriggered: {
-            const rows = []
-            for (let row = 0; row < processInspector.rowCount(); ++row) {
-                const usage = Number(processInspector.data(processInspector.index(row, 2), Process.ProcessDataModel.Value))
-                const module = String(processInspector.data(processInspector.index(row, 4), Process.ProcessDataModel.Value) || "")
-                if (usage > 0 || module.length > 0) {
-                    rows.push({
-                        name: processInspector.data(processInspector.index(row, 0), Process.ProcessDataModel.Value),
-                        pid: processInspector.data(processInspector.index(row, 1), Process.ProcessDataModel.Value),
-                        usage: usage,
-                        memory: processInspector.data(processInspector.index(row, 3), Process.ProcessDataModel.FormattedValue),
-                        module: module
-                    })
-                }
-            }
-            console.warn("GPU_PROCESS_ROWS=" + JSON.stringify(rows))
-        }
-    }
 
     property int updateInterval: 1000
     property int historyLength: 72
