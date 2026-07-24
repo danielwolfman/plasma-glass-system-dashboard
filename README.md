@@ -14,6 +14,8 @@ configurable warning and critical thresholds.
 - NVIDIA and Intel GPU utilization, memory, temperature, power, and frequency
 - Network download and upload history
 - Disk read and write activity
+- Ranked CPU, memory, and GPU process lists
+- Combined GPU consumers with per-row `RTX` and `INTEL` indicators
 - Configurable outer-background and card opacity
 - Optional accent glow
 - Configurable warning and critical levels

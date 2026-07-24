@@ -111,7 +111,7 @@ PlasmoidItem {
             return "RTX"
         }
         if (gpu.indexOf("intel") >= 0 || gpu.indexOf("arc") >= 0) {
-            return "ARC"
+            return "INTEL"
         }
         return ""
     }
@@ -145,10 +145,70 @@ PlasmoidItem {
         return rows.slice(0, limit)
     }
 
+    function collectTopGpuProcesses(limit) {
+        const rows = []
+        for (let row = 0; row < processModel.rowCount(); ++row) {
+            const usageIndex = processModel.index(row, 4)
+            const memoryIndex = processModel.index(row, 5)
+            const usage = Number(processModel.data(usageIndex, Processes.ProcessDataModel.Value)) || 0
+            const memory = Number(processModel.data(memoryIndex, Processes.ProcessDataModel.Value)) || 0
+            const label = gpuLabel(processModel.data(processModel.index(row, 6), Processes.ProcessDataModel.Value))
+
+            // Retaining GPU memory still means the process is a GPU consumer,
+            // even when it happens to be idle during this sample.
+            if (label.length === 0 || (usage <= 0 && memory <= 0)) {
+                continue
+            }
+
+            const processName = shortProcessName(processModel.data(processModel.index(row, 0), Processes.ProcessDataModel.Value))
+            const usageText = (usage < 10 ? usage.toFixed(1) : Math.round(usage)) + "%"
+            const memoryText = processModel.data(memoryIndex, Processes.ProcessDataModel.FormattedValue)
+            rows.push({
+                name: processName,
+                pid: processModel.data(processModel.index(row, 1), Processes.ProcessDataModel.Value),
+                value: usage,
+                memory: memory,
+                formatted: usageText + " · " + memoryText,
+                gpuLabel: label
+            })
+        }
+
+        rows.sort((left, right) => {
+            if (right.value !== left.value) {
+                return right.value - left.value
+            }
+            return right.memory - left.memory
+        })
+
+        // Reserve half the list for each GPU so a busy device cannot hide all
+        // consumers of the other one. Fill any unused slots from the remainder.
+        const perGpu = Math.max(1, Math.floor(limit / 2))
+        let selected = rows.filter(entry => entry.gpuLabel === "RTX").slice(0, perGpu)
+            .concat(rows.filter(entry => entry.gpuLabel === "INTEL").slice(0, perGpu))
+        const selectedPids = {}
+        for (let i = 0; i < selected.length; ++i) {
+            selectedPids[selected[i].pid + ":" + selected[i].gpuLabel] = true
+        }
+        for (let j = 0; j < rows.length && selected.length < limit; ++j) {
+            const key = rows[j].pid + ":" + rows[j].gpuLabel
+            if (!selectedPids[key]) {
+                selected.push(rows[j])
+                selectedPids[key] = true
+            }
+        }
+        selected.sort((left, right) => {
+            if (right.value !== left.value) {
+                return right.value - left.value
+            }
+            return right.memory - left.memory
+        })
+        return selected.slice(0, limit)
+    }
+
     function updateTopProcesses() {
         topCpuProcesses = collectTopProcesses(2, 4)
         topMemoryProcesses = collectTopProcesses(3, 4)
-        topGpuProcesses = collectTopProcesses(4, 4)
+        topGpuProcesses = collectTopGpuProcesses(4)
     }
 
     fullRepresentation: Item {
@@ -534,7 +594,7 @@ PlasmoidItem {
                     Layout.fillHeight: true
                     Layout.preferredWidth: 1
                     title: i18n("Top GPU")
-                    subtitle: i18n("process usage")
+                    subtitle: i18n("RTX + Intel")
                     accent: "#76e06f"
                     cardOpacity: root.cardOpacity
 

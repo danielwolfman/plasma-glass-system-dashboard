@@ -89,11 +89,11 @@ ColumnLayout {
                 }
 
                 Text {
-                    Layout.preferredWidth: 68
+                    Layout.preferredWidth: root.showGpuLabel ? 98 : 68
                     horizontalAlignment: Text.AlignRight
                     text: processRow.modelData.formatted
                     color: root.accent
-                    font.pixelSize: 11
+                    font.pixelSize: root.showGpuLabel ? 10 : 11
                     font.weight: Font.DemiBold
                     font.family: "monospace"
                     elide: Text.ElideLeft
