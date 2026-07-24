@@ -18,6 +18,8 @@ PlasmoidItem {
     property var topCpuProcesses: []
     property var topMemoryProcesses: []
     property var topGpuProcesses: []
+    property bool deviceGpuCollectorBusy: false
+    property bool deviceGpuCollectorReady: false
     property real networkMaximum: 1048576
 
     readonly property int warningLevel: Plasmoid.configuration.warningLevel || 70
@@ -25,6 +27,7 @@ PlasmoidItem {
     readonly property real backgroundOpacity: Math.max(0, Math.min(100, Plasmoid.configuration.backgroundOpacity)) / 100
     readonly property real cardOpacity: Math.max(0, Math.min(100, Plasmoid.configuration.cardOpacity)) / 100
     readonly property bool showAccentGlow: Plasmoid.configuration.showAccentGlow
+    readonly property int logicalCpuCount: Math.max(1, Math.round(number(cpuCoreCount)))
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     Plasmoid.title: i18n("Glass System Dashboard")
@@ -116,6 +119,21 @@ PlasmoidItem {
         return ""
     }
 
+    function formatKib(value) {
+        const kib = Math.max(0, Number(value) || 0)
+        if (kib >= 1048576) {
+            return (kib / 1048576).toFixed(1) + " GiB"
+        }
+        if (kib >= 1024) {
+            return (kib / 1024).toFixed(1) + " MiB"
+        }
+        return Math.round(kib) + " KiB"
+    }
+
+    function shellQuote(value) {
+        return "'" + String(value).replace(/'/g, "'\"'\"'") + "'"
+    }
+
     function collectTopProcesses(metricColumn, limit) {
         const rows = []
         for (let row = 0; row < processModel.rowCount(); ++row) {
@@ -125,7 +143,12 @@ PlasmoidItem {
                 continue
             }
 
+            let displayedValue = value
             let formatted = processModel.data(valueIndex, Processes.ProcessDataModel.FormattedValue)
+            if (metricColumn === 2) {
+                displayedValue = value / logicalCpuCount
+                formatted = (displayedValue < 10 ? displayedValue.toFixed(1) : Math.round(displayedValue)) + "%"
+            }
             if (metricColumn === 4) {
                 formatted = (value < 10 ? value.toFixed(1) : Math.round(value)) + "%"
             }
@@ -136,13 +159,45 @@ PlasmoidItem {
             rows.push({
                 name: (metricColumn === 2 || metricColumn === 3) && commandLine.length > 0 ? commandLine : processName,
                 pid: processModel.data(processModel.index(row, 1), Processes.ProcessDataModel.Value),
-                value: value,
+                value: displayedValue,
+                rawValue: value,
                 formatted: formatted,
                 gpuLabel: gpuLabel(processModel.data(processModel.index(row, 6), Processes.ProcessDataModel.Value))
             })
         }
         rows.sort((left, right) => right.value - left.value)
         return rows.slice(0, limit)
+    }
+
+    function balanceGpuRows(rows, limit) {
+        rows.sort((left, right) => {
+            if (right.value !== left.value) {
+                return right.value - left.value
+            }
+            return right.memory - left.memory
+        })
+
+        const perGpu = Math.max(1, Math.floor(limit / 2))
+        let selected = rows.filter(entry => entry.gpuLabel === "RTX").slice(0, perGpu)
+            .concat(rows.filter(entry => entry.gpuLabel === "INTEL").slice(0, perGpu))
+        const selectedKeys = {}
+        for (let i = 0; i < selected.length; ++i) {
+            selectedKeys[selected[i].pid + ":" + selected[i].gpuLabel] = true
+        }
+        for (let j = 0; j < rows.length && selected.length < limit; ++j) {
+            const key = rows[j].pid + ":" + rows[j].gpuLabel
+            if (!selectedKeys[key]) {
+                selected.push(rows[j])
+                selectedKeys[key] = true
+            }
+        }
+        selected.sort((left, right) => {
+            if (right.value !== left.value) {
+                return right.value - left.value
+            }
+            return right.memory - left.memory
+        })
+        return selected.slice(0, limit)
     }
 
     function collectTopGpuProcesses(limit) {
@@ -173,52 +228,65 @@ PlasmoidItem {
             })
         }
 
-        rows.sort((left, right) => {
-            if (right.value !== left.value) {
-                return right.value - left.value
-            }
-            return right.memory - left.memory
-        })
+        return balanceGpuRows(rows, limit)
+    }
 
-        // Reserve half the list for each GPU so a busy device cannot hide all
-        // consumers of the other one. Fill any unused slots from the remainder.
-        const perGpu = Math.max(1, Math.floor(limit / 2))
-        let selected = rows.filter(entry => entry.gpuLabel === "RTX").slice(0, perGpu)
-            .concat(rows.filter(entry => entry.gpuLabel === "INTEL").slice(0, perGpu))
-        const selectedPids = {}
-        for (let i = 0; i < selected.length; ++i) {
-            selectedPids[selected[i].pid + ":" + selected[i].gpuLabel] = true
-        }
-        for (let j = 0; j < rows.length && selected.length < limit; ++j) {
-            const key = rows[j].pid + ":" + rows[j].gpuLabel
-            if (!selectedPids[key]) {
-                selected.push(rows[j])
-                selectedPids[key] = true
+    function parseDeviceGpuProcesses(output) {
+        const rows = []
+        const lines = String(output || "").trim().split("\n")
+        for (let i = 0; i < lines.length; ++i) {
+            const fields = lines[i].split("\t")
+            if (fields.length < 5 || (fields[0] !== "RTX" && fields[0] !== "INTEL")) {
+                continue
             }
+            const usage = Number(fields[3]) || 0
+            const memory = Number(fields[4]) || 0
+            rows.push({
+                name: shortProcessName(fields[2]),
+                pid: Number(fields[1]) || 0,
+                value: usage,
+                memory: memory,
+                formatted: (usage < 10 ? usage.toFixed(1) : Math.round(usage)) + "% · " + formatKib(memory),
+                gpuLabel: fields[0]
+            })
         }
-        selected.sort((left, right) => {
-            if (right.value !== left.value) {
-                return right.value - left.value
+        topGpuProcesses = balanceGpuRows(rows, 4)
+        deviceGpuCollectorReady = true
+    }
+
+    function sampleDeviceGpuProcesses() {
+        if (deviceGpuCollectorBusy) {
+            return
+        }
+        deviceGpuCollectorBusy = true
+        let path = Qt.resolvedUrl("../scripts/gpu_processes.py").toString()
+        path = decodeURIComponent(path.replace(/^file:\/\//, ""))
+        gpuProcessCommand.exec(shellQuote(path), function(result) {
+            deviceGpuCollectorBusy = false
+            if (result.exitCode === 0) {
+                parseDeviceGpuProcesses(result.stdout)
+            } else {
+                deviceGpuCollectorReady = false
             }
-            return right.memory - left.memory
         })
-        return selected.slice(0, limit)
     }
 
     function updateTopProcesses() {
         topCpuProcesses = collectTopProcesses(2, 4)
         topMemoryProcesses = collectTopProcesses(3, 4)
-        topGpuProcesses = collectTopGpuProcesses(4)
+        if (!deviceGpuCollectorReady) {
+            topGpuProcesses = collectTopGpuProcesses(4)
+        }
     }
 
     fullRepresentation: Item {
         id: dashboard
         implicitWidth: 1180
-        implicitHeight: 760
+        implicitHeight: 700 + coreMap.implicitHeight
         Layout.minimumWidth: 760
-        Layout.minimumHeight: 560
+        Layout.minimumHeight: 700 + coreMap.implicitHeight
         Layout.preferredWidth: 1180
-        Layout.preferredHeight: 760
+        Layout.preferredHeight: 700 + coreMap.implicitHeight
 
         Rectangle {
             anchors.fill: parent
@@ -309,6 +377,7 @@ PlasmoidItem {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 200
                 Layout.preferredHeight: 1
                 spacing: 12
 
@@ -442,6 +511,7 @@ PlasmoidItem {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 200
                 Layout.preferredHeight: 0.92
                 spacing: 12
 
@@ -554,6 +624,7 @@ PlasmoidItem {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 145
                 Layout.preferredHeight: 0.72
                 spacing: 12
 
@@ -562,7 +633,7 @@ PlasmoidItem {
                     Layout.fillHeight: true
                     Layout.preferredWidth: 1
                     title: i18n("Top CPU")
-                    subtitle: i18n("process usage")
+                    subtitle: i18n("whole-system share")
                     accent: "#55d6be"
                     cardOpacity: root.cardOpacity
 
@@ -606,8 +677,29 @@ PlasmoidItem {
                     }
                 }
             }
+
+            DashboardCard {
+                Layout.fillWidth: true
+                Layout.preferredHeight: coreMap.implicitHeight + 42
+                Layout.minimumHeight: coreMap.implicitHeight + 42
+                title: i18n("CPU Core Map")
+                subtitle: i18n("%1 logical processors", root.logicalCpuCount)
+                accent: "#55d6be"
+                cardOpacity: root.cardOpacity
+
+                CoreMap {
+                    id: coreMap
+                    anchors.fill: parent
+                    coreCount: root.logicalCpuCount
+                    updateInterval: root.updateInterval
+                    warningLevel: root.warningLevel
+                    criticalLevel: root.criticalLevel
+                }
+            }
         }
     }
+
+    RunCommand { id: gpuProcessCommand }
 
     Processes.ProcessDataModel {
         id: processModel
@@ -658,5 +750,13 @@ PlasmoidItem {
         running: true
         triggeredOnStart: true
         onTriggered: root.updateTopProcesses()
+    }
+
+    Timer {
+        interval: 2500
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.sampleDeviceGpuProcesses()
     }
 }

@@ -10,12 +10,14 @@ configurable warning and critical thresholds.
 ## Features
 
 - CPU load history, frequency, and temperature
+- Adaptive ring-gauge map for every logical CPU
 - Memory and storage ring gauges
 - NVIDIA and Intel GPU utilization, memory, temperature, power, and frequency
 - Network download and upload history
 - Disk read and write activity
 - Ranked CPU, memory, and GPU process lists
 - Combined GPU consumers with per-row `RTX` and `INTEL` indicators
+- Device-aware hybrid-GPU collection, including processes active on both GPUs
 - Configurable outer-background and card opacity
 - Optional accent glow
 - Configurable warning and critical levels
@@ -25,6 +27,7 @@ configurable warning and critical thresholds.
 - KDE Plasma 6
 - `ksystemstats`
 - `libksysguard`
+- Python 3 (for the device-aware GPU process collector)
 
 The sensor identifiers in this version are arranged for a hybrid laptop where
 `gpu0` is NVIDIA and `gpu1` is Intel. They can be adjusted in
