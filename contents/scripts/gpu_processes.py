@@ -45,20 +45,23 @@ def snapshot_intel():
                 continue
 
             pid = int(proc_entry.name)
-            name = read_text(f"/proc/{pid}/comm").strip().replace("\t", " ")
-            if not name:
-                continue
-
             clients = {}
             try:
-                fdinfo_entries = os.scandir(f"/proc/{pid}/fdinfo")
+                fd_entries = os.scandir(f"/proc/{pid}/fd")
             except (FileNotFoundError, PermissionError, ProcessLookupError, OSError):
                 continue
 
-            with fdinfo_entries:
-                for fdinfo_entry in fdinfo_entries:
+            with fd_entries:
+                for fd_entry in fd_entries:
+                    try:
+                        target = os.readlink(fd_entry.path)
+                    except (FileNotFoundError, PermissionError, ProcessLookupError, OSError):
+                        continue
+                    if not target.startswith("/dev/dri/renderD"):
+                        continue
+
                     fields = {}
-                    contents = read_text(fdinfo_entry.path)
+                    contents = read_text(f"/proc/{pid}/fdinfo/{fd_entry.name}")
                     if "drm-driver:" not in contents:
                         continue
                     for line in contents.splitlines():
@@ -69,7 +72,7 @@ def snapshot_intel():
                     if fields.get("drm-driver") != "i915":
                         continue
 
-                    client = fields.get("drm-client-id", fdinfo_entry.name)
+                    client = fields.get("drm-client-id", fd_entry.name)
                     device = fields.get("drm-pdev", "intel")
                     render = numeric_value(fields.get("drm-engine-render", "0"))
                     resident = sum(
@@ -82,6 +85,9 @@ def snapshot_intel():
                     clients[client_key] = (max(previous[0], render), max(previous[1], resident))
 
             if clients:
+                name = read_text(f"/proc/{pid}/comm").strip().replace("\t", " ")
+                if not name:
+                    continue
                 processes[pid] = {
                     "name": name,
                     "render": sum(client[0] for client in clients.values()),

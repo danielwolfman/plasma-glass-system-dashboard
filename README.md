@@ -3,9 +3,11 @@
 A wide, translucent system-monitor widget for KDE Plasma 6, inspired by the
 dashboard layout of Plasma System Monitor.
 
-It displays live CPU, memory, NVIDIA and Intel GPU, network, and storage data
-through KDE's `ksystemstats` sensor backend. Values switch to yellow or red at
-configurable warning and critical thresholds.
+It displays live CPU, memory, NVIDIA and Intel GPU, network, storage, battery,
+power-source, and cooling data. Most values come from KDE's `ksystemstats`
+sensor backend; device-aware GPU and power telemetry use lightweight bundled
+collectors. Values switch to yellow or red at configurable warning and critical
+thresholds.
 
 ## Features
 
@@ -15,6 +17,9 @@ configurable warning and critical thresholds.
 - NVIDIA and Intel GPU utilization, memory, temperature, power, and frequency
 - Network download and upload history
 - Disk read and write activity
+- Battery charge, health, stored energy, signed charge/discharge flow, and time estimate
+- USB-C PD contract and advertised source capacity
+- ThinkPad fan RPM with dual-fan support
 - Ranked CPU, memory, and GPU process lists
 - Combined GPU consumers with per-row `RTX` and `INTEL` indicators
 - Device-aware hybrid-GPU collection, including processes active on both GPUs
@@ -27,7 +32,8 @@ configurable warning and critical thresholds.
 - KDE Plasma 6
 - `ksystemstats`
 - `libksysguard`
-- Python 3 (for the device-aware GPU process collector)
+- Python 3 (for the bundled GPU and power collectors)
+- UPower and Linux sysfs power/hardware-monitor interfaces
 
 The sensor identifiers in this version are arranged for a hybrid laptop where
 `gpu0` is NVIDIA and `gpu1` is Intel. They can be adjusted in
