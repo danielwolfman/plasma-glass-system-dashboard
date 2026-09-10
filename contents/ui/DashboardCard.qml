@@ -6,13 +6,13 @@ Rectangle {
     property string title: ""
     property string subtitle: ""
     property color accent: "#71d7ff"
-    property real cardOpacity: 0.38
+    property real cardOpacity: 0.72
     default property alias contentData: body.data
 
     color: Qt.rgba(0.025, 0.028, 0.032, root.cardOpacity)
     border.color: Qt.rgba(1, 1, 1, Math.min(0.16, root.cardOpacity * 0.30))
     border.width: 1
-    radius: 14
+    radius: 12
 
     Rectangle {
         width: 3
@@ -27,6 +27,9 @@ Rectangle {
 
     Text {
         id: heading
+        anchors.right: subtitleLabel.left
+        anchors.rightMargin: 8
+        elide: Text.ElideRight
         text: root.title.toUpperCase()
         color: "#e8f4f8"
         font.pixelSize: 12
@@ -39,6 +42,10 @@ Rectangle {
     }
 
     Text {
+        id: subtitleLabel
+        width: Math.min(implicitWidth, parent.width * 0.48)
+        horizontalAlignment: Text.AlignRight
+        elide: Text.ElideRight
         text: root.subtitle
         color: "#708893"
         font.pixelSize: 10

@@ -5,10 +5,10 @@
     <kcfgfile name=""/>
     <group name="General">
         <entry name="backgroundOpacity" type="Int">
-            <default>0</default>
+            <default>28</default>
         </entry>
         <entry name="cardOpacity" type="Int">
-            <default>38</default>
+            <default>72</default>
         </entry>
         <entry name="showAccentGlow" type="Bool">
             <default>false</default>

@@ -7,7 +7,7 @@
             }
         ],
         "Category": "System Information",
-        "Description": "A wide glass dashboard for CPU, memory, GPU, network, and storage",
+        "Description": "A wide glass dashboard for CPU, memory, GPU, network, storage, power, and cooling",
         "FormFactors": [
             "desktop"
         ],
@@ -15,8 +15,8 @@
         "Id": "org.daniel.systemdashboard",
         "License": "GPL-3.0-or-later",
         "Name": "Glass System Dashboard",
-        "Version": "1.2.0",
-        "Website": "https://kde.org"
+        "Version": "1.5.0",
+        "Website": "https://github.com/danielwolfman/plasma-glass-system-dashboard"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
 }
