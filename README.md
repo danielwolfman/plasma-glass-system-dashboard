@@ -39,6 +39,19 @@ The sensor identifiers in this version are arranged for a hybrid laptop where
 `gpu0` is NVIDIA and `gpu1` is Intel. They can be adjusted in
 `contents/ui/main.qml` for other hardware layouts.
 
+## Desktop layout
+
+At widths of 1500 pixels and above, the dashboard uses a compact, horizontal
+layout intended to share a screen with the other Glass dashboard: System above,
+Codex below. Both default to 1880 × 500 pixels and allow unlimited expansion.
+Leave Plasma's screen-edge margins and bottom panel clear when placing them.
+
+Hardware cards fill the first row; processes, power, and a compact CPU core map
+fill the second. Below 1500 pixels, cards return to four rows and full core gauges.
+The minimum width is 960 pixels; the wide minimum height is 450 pixels. Narrow
+layouts reserve additional height for the core map. Background and card opacity
+remain configurable in Appearance, with more opaque glass defaults for legibility.
+
 ## Install
 
 ```bash

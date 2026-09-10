@@ -369,12 +369,15 @@ PlasmoidItem {
 
     fullRepresentation: Item {
         id: dashboard
-        implicitWidth: 1180
-        implicitHeight: 700 + coreMap.implicitHeight
-        Layout.minimumWidth: 760
-        Layout.minimumHeight: 700 + coreMap.implicitHeight
-        Layout.preferredWidth: 1180
-        Layout.preferredHeight: 700 + coreMap.implicitHeight
+        readonly property bool wideLayout: width >= 1500
+        implicitWidth: 1880
+        implicitHeight: wideLayout ? 500 : 700 + coreMap.implicitHeight
+        Layout.minimumWidth: 960
+        Layout.minimumHeight: wideLayout ? 450 : 700 + coreMap.implicitHeight
+        Layout.preferredWidth: implicitWidth
+        Layout.preferredHeight: implicitHeight
+        Layout.maximumWidth: Infinity
+        Layout.maximumHeight: Infinity
 
         Rectangle {
             anchors.fill: parent
@@ -397,12 +400,12 @@ PlasmoidItem {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
+            anchors.margins: 14
+            spacing: 10
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 38
+                Layout.preferredHeight: 28
                 spacing: 10
 
                 Rectangle {
@@ -431,7 +434,7 @@ PlasmoidItem {
                         font.letterSpacing: 1.5
                     }
                     Text {
-                        text: i18n("Live hardware telemetry · 1 second refresh")
+                        text: i18n("Live hardware telemetry · 2 second refresh")
                         color: "#718893"
                         font.pixelSize: 10
                     }
@@ -462,17 +465,22 @@ PlasmoidItem {
                 }
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumHeight: 200
-                Layout.preferredHeight: 1
-                spacing: 12
+                columns: dashboard.wideLayout ? 6 : 12
+                columnSpacing: 10
+                rowSpacing: 10
 
                 DashboardCard {
+                    Layout.row: 0
+                    Layout.column: 0
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 2.25
                     title: i18n("Processor")
                     subtitle: cpuFrequency.formattedValue
                     accent: root.percentColor(root.number(cpuUsage), "#55d6be")
@@ -523,9 +531,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: 0
+                    Layout.column: dashboard.wideLayout ? 1 : 4
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillHeight: true
                     Layout.fillWidth: true
-                    Layout.preferredWidth: 1.18
                     title: i18n("Memory")
                     subtitle: memoryUsed.formattedValue
                     accent: root.percentColor(root.number(memoryUsage), "#c792ea")
@@ -543,9 +556,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: 0
+                    Layout.column: dashboard.wideLayout ? 2 : 8
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1.65
                     title: i18n("NVIDIA GPU")
                     subtitle: "RTX 500 Ada"
                     accent: root.percentColor(root.number(gpu0Usage), "#76e06f")
@@ -594,19 +612,16 @@ PlasmoidItem {
                         }
                     }
                 }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumHeight: 200
-                Layout.preferredHeight: 0.92
-                spacing: 12
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 0 : 1
+                    Layout.column: dashboard.wideLayout ? 3 : 0
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 2.25
                     title: i18n("Network")
                     subtitle: i18n("all interfaces")
                     accent: "#71d7ff"
@@ -648,9 +663,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 0 : 1
+                    Layout.column: 4
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1.18
                     title: i18n("Storage")
                     subtitle: "/ · nvme0n1p2"
                     accent: root.percentColor(root.number(diskUsage), "#ffcc66")
@@ -662,8 +682,13 @@ PlasmoidItem {
 
                         RingGauge {
                             Layout.alignment: Qt.AlignHCenter
-                            Layout.preferredWidth: Math.min(parent.width, parent.height) * 0.70
-                            Layout.preferredHeight: Layout.preferredWidth
+                            id: storageGauge
+                            Layout.preferredWidth: Math.min(parent.width, parent.height - 24)
+                            Layout.preferredHeight: storageGauge.Layout.preferredWidth
+                            Layout.minimumWidth: 100
+                            Layout.minimumHeight: 100
+                            Layout.maximumWidth: 160
+                            Layout.maximumHeight: 160
                             value: root.number(diskUsage)
                             title: i18n("USED")
                             detail: diskUsed.formattedValue
@@ -680,9 +705,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 0 : 1
+                    Layout.column: dashboard.wideLayout ? 5 : 8
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 4
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: 200
+                    Layout.preferredHeight: 210
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1.65
                     title: i18n("INTEL GPU")
                     subtitle: "Meteor Lake Arc"
                     accent: root.percentColor(root.number(gpu1Usage), "#68a7ff")
@@ -707,19 +737,16 @@ PlasmoidItem {
                         }
                     }
                 }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumHeight: 145
-                Layout.preferredHeight: 0.72
-                spacing: 12
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 1 : 2
+                    Layout.column: 0
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 3
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: dashboard.wideLayout ? 170 : 145
+                    Layout.preferredHeight: dashboard.wideLayout ? 190 : 145
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1
                     title: i18n("Top CPU")
                     subtitle: i18n("whole-system share")
                     accent: "#55d6be"
@@ -733,9 +760,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 1 : 2
+                    Layout.column: dashboard.wideLayout ? 1 : 3
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 3
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: dashboard.wideLayout ? 170 : 145
+                    Layout.preferredHeight: dashboard.wideLayout ? 190 : 145
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1
                     title: i18n("Top Memory")
                     subtitle: i18n("resident memory")
                     accent: "#c792ea"
@@ -749,9 +781,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 1 : 2
+                    Layout.column: dashboard.wideLayout ? 2 : 6
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 3
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: dashboard.wideLayout ? 170 : 145
+                    Layout.preferredHeight: dashboard.wideLayout ? 190 : 145
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1
                     title: i18n("Top GPU")
                     subtitle: i18n("RTX + Intel")
                     accent: "#76e06f"
@@ -766,9 +803,14 @@ PlasmoidItem {
                 }
 
                 DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 1 : 2
+                    Layout.column: dashboard.wideLayout ? 3 : 9
+                    Layout.columnSpan: dashboard.wideLayout ? 1 : 3
+                    Layout.preferredWidth: 1
+                    Layout.minimumHeight: dashboard.wideLayout ? 170 : 145
+                    Layout.preferredHeight: dashboard.wideLayout ? 190 : 145
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 1
                     title: i18n("Power & Cooling")
                     subtitle: powerTelemetry.adapter_online ? i18n("AC connected") : i18n("on battery")
                     accent: root.batteryFlowColor()
@@ -776,66 +818,78 @@ PlasmoidItem {
 
                     GridLayout {
                         anchors.fill: parent
-                        columns: 2
+                        columns: dashboard.wideLayout ? 1 : 2
                         columnSpacing: 12
                         rowSpacing: 4
 
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
                             title: i18n("BATTERY")
                             valueText: Math.round(root.powerNumber("battery_percent")) + "% · " + root.batteryStateText()
                             valueColor: root.percentColor(100 - root.powerNumber("battery_percent"), "#55d6be")
                         }
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
                             title: i18n("BATTERY FLOW")
                             valueText: root.batteryFlowText()
                             valueColor: root.batteryFlowColor()
                         }
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
                             title: i18n("ESTIMATE")
                             valueText: root.batteryEstimateText()
                             valueColor: "#c792ea"
                         }
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
                             title: i18n("USB-C PD")
                             valueText: root.sourceText()
                             valueColor: powerTelemetry.adapter_online ? "#55d6be" : "#8ca3ae"
                         }
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
                             title: i18n("COOLING FANS")
                             valueText: root.fansText()
                             valueColor: root.fanColor()
                         }
                         TelemetryMetric {
+                            horizontal: dashboard.wideLayout
                             Layout.fillWidth: true
-                            title: i18n("ENERGY / HEALTH")
+                            title: dashboard.wideLayout ? i18n("ENERGY / SOH") : i18n("ENERGY / HEALTH")
                             valueText: root.batteryEnergyText()
                             valueColor: "#9ac7d8"
                         }
                     }
                 }
-            }
 
-            DashboardCard {
-                Layout.fillWidth: true
-                Layout.preferredHeight: coreMap.implicitHeight + 42
-                Layout.minimumHeight: coreMap.implicitHeight + 42
-                title: i18n("CPU Core Map")
-                subtitle: i18n("%1 logical processors", root.logicalCpuCount)
-                accent: "#55d6be"
-                cardOpacity: root.cardOpacity
+                DashboardCard {
+                    Layout.row: dashboard.wideLayout ? 1 : 3
+                    Layout.column: dashboard.wideLayout ? 4 : 0
+                    Layout.columnSpan: dashboard.wideLayout ? 2 : 12
+                    Layout.preferredWidth: 2
+                    Layout.minimumHeight: dashboard.wideLayout ? 170 : coreMap.implicitHeight + 42
+                    Layout.preferredHeight: dashboard.wideLayout ? 190 : coreMap.implicitHeight + 42
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: i18n("CPU Core Map")
+                    subtitle: i18n("%1 logical processors", root.logicalCpuCount)
+                    accent: "#55d6be"
+                    cardOpacity: root.cardOpacity
 
-                CoreMap {
-                    id: coreMap
-                    anchors.fill: parent
-                    coreCount: root.logicalCpuCount
-                    updateInterval: root.updateInterval
-                    warningLevel: root.warningLevel
-                    criticalLevel: root.criticalLevel
+                    CoreMap {
+                        id: coreMap
+                        anchors.fill: parent
+                        compact: dashboard.wideLayout
+                        coreCount: root.logicalCpuCount
+                        updateInterval: root.updateInterval
+                        warningLevel: root.warningLevel
+                        criticalLevel: root.criticalLevel
+                    }
                 }
             }
         }
